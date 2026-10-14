@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-screen overflow-hidden">
+<head>
+  <link rel="manifest" href="manifest.json">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StreamFlix Local</title>
+
+  <!-- Support Plein Écran / Application -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="StreamFlix">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    html, body { background-color: #0f172a; color: #f8fafc; height: 100vh; width: 100vw; overflow: hidden; margin: 0; padding: 0; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .drag-scroll { cursor: grab; user-select: none; }
+    .drag-scroll:active { cursor: grabbing; }
+  </style>
+</head>
+<body class="flex flex-col font-sans h-screen overflow-hidden">
+
+  <!-- Header / Navigation -->
+  <header id="mainHeader" class="bg-slate-900 border-b border-slate-800 p-3 shrink-0 z-50">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+      <h1 class="text-xl font-bold text-indigo-500 cursor-pointer" onclick="showHome()">StreamFlix by F</h1>
+      
+      <div class="flex items-center gap-2 w-full md:w-auto">
+        <input type="text" id="searchInput" placeholder="Rechercher..."
+               class="bg-slate-800 text-white px-3 py-1.5 rounded-lg border border-slate-700 w-full md:w-80 focus:outline-none focus:border-indigo-500 text-sm">
+        <button onclick="searchTMDB(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg transition text-sm">Chercher</button>
+      </div>
+
+      <div class="flex items-center gap-3 text-sm">
+        <button id="traktBtn" onclick="handleTraktAuth()" class="bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded font-semibold text-white">Connexion Trakt</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenu Principal -->
+  <main class="flex-1 w-full overflow-hidden relative flex flex-col">
+
+    <!-- Bouton Retour en haut -->
+    <button id="scrollTopBtn" onclick="scrollToTop()" class="hidden fixed bottom-6 right-6 z-50 bg-indigo-600/90 hover:bg-indigo-600 text-white p-3 rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center border border-indigo-400/30">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+      </svg>
+    </button>
+
+    <!-- Bannière / Contrôle du dernier média lancé -->
+    <section id="lastMediaSection" class="hidden absolute top-4 right-4 z-50 p-3 bg-slate-900/90 backdrop-blur rounded-xl border border-indigo-500/30 flex items-center gap-4 shadow-2xl">
+      <div>
+        <span class="text-[10px] text-indigo-400 font-bold uppercase block">Lecteur en cours</span>
+        <h2 id="lastMediaTitle" class="text-xs font-bold text-white truncate max-w-[200px]"></h2>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="reopenLastMedia()" class="bg-indigo-600 hover:bg-indigo-700 px-2 py-1 rounded text-[10px] text-white font-medium">▶ ROUVRIR</button>
+        <button id="markWatchedBtn" onclick="markCurrentAsWatched()" class="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-[10px] text-white font-medium hidden">✓ Vu</button>
+      </div>
+    </section>
+
+    <!-- ACCUEIL -->
+    <div id="homeView" class="h-full overflow-y-auto p-6 space-y-6 no-scrollbar">
+      <section>
+        <h2 class="text-lg font-bold mb-3 text-slate-200">Plateformes de Streaming</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          <div onclick="openProvider(8, 'Netflix')" class="bg-red-950/40 hover:bg-red-900/50 border border-red-800/50 p-3 rounded-xl text-center cursor-pointer transition">
+            <span class="text-sm font-extrabold text-red-500">NETFLIX</span>
+          </div>
+          <div onclick="openProvider(119, 'Prime Video')" class="bg-sky-950/40 hover:bg-sky-900/50 border border-sky-800/50 p-3 rounded-xl text-center cursor-pointer transition">
+            <span class="text-sm font-extrabold text-sky-400">PRIME VIDEO</span>
+          </div>
+          <div onclick="openProvider(337, 'Disney+')" class="bg-blue-950/40 hover:bg-blue-900/50 border border-blue-800/50 p-3 rounded-xl text-center cursor-pointer transition">
+            <span class="text-sm font-extrabold text-blue-400">DISNEY+</span>
+          </div>
+          <div onclick="openProvider(350, 'Apple TV+')" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 p-3 rounded-xl text-center cursor-pointer transition">
+            <span class="text-sm font-extrabold text-slate-200">APPLE TV+</span>
+          </div>
+          <div onclick="openProvider(1899, 'HBO Max')" class="bg-purple-950/40 hover:bg-purple-900/50 border border-purple-800/50 p-3 rounded-xl text-center cursor-pointer transition">
+            <span class="text-sm font-extrabold text-purple-400">HBO MAX</span>
+          </div>
+          <div onclick="openProvider(531, 'Paramount+')" class="bg-blue-900/30 hover:bg-blue-800/40 border border-blue-700/50 p-3 rounded-xl text-center cursor-pointer transition">
+            <span class="text-sm font-extrabold text-blue-300">PARAMOUNT+</span>
+          </div>
+          <div onclick="openProvider(1889, 'Universal+')" class="bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-800/50 p-3 rounded-xl text-center cursor-pointer transition">
+            <span class="text-sm font-extrabold text-indigo-300">UNIVERSAL+</span>
+          </div>
+          <div onclick="openProvider('283|56', 'Animes (ADN & Crunchyroll)')" class="bg-orange-950/40 hover:bg-orange-900/50 border border-orange-800/50 p-3 rounded-xl text-center cursor-pointer transition">
+            <span class="text-sm font-extrabold text-orange-400">ANIMES</span>
+          </div>
+          <div onclick="openProvider('381|1754|2535|147', 'France')" class="bg-blue-950/40 hover:bg-blue-900/50 border border-blue-700/50 p-3 rounded-xl text-center cursor-pointer transition">
+            <span class="text-sm font-extrabold text-blue-400">FRANCE</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="flex gap-4 border-b border-slate-800 pb-2 mb-4">
+          <button id="tabProgressShow" onclick="switchTraktTab('progress-show')" class="font-bold text-indigo-400 border-b-2 border-indigo-500 pb-1 text-sm">📊 En cours (Séries)</button>
+          <button id="tabStartShow" onclick="switchTraktTab('start-show')" class="font-bold text-slate-400 hover:text-white pb-1 text-sm">🚀 À commencer (Séries)</button>
+          <button id="tabStartMovie" onclick="switchTraktTab('start-movie')" class="font-bold text-slate-400 hover:text-white pb-1 text-sm">🎬 À commencer (Films)</button>
+        </div>
+        <div id="traktGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-12">
+          <p class="text-slate-500 col-span-full">Connectez votre compte Trakt.tv pour afficher ces sections.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- VUE PLATEFORME -->
+    <div id="providerView" class="hidden h-full overflow-y-auto p-6 space-y-4 no-scrollbar">
+      <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl relative flex items-center justify-between">
+        <button onclick="showHome()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded">← Retour Accueil</button>
+        <h2 id="providerTitle" class="text-xl font-bold text-indigo-400 absolute left-1/2 -translate-x-1/2"></h2>
+        <div></div>
+      </div>
+      <div class="flex flex-wrap gap-3 items-center text-sm pb-2">
+        <div class="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
+          <button id="typeMovieBtn" onclick="setFilterType('movie')" class="px-3 py-1 rounded bg-indigo-600 text-white font-medium text-xs">Films</button>
+          <button id="typeTvBtn" onclick="setFilterType('tv')" class="px-3 py-1 rounded text-slate-400 hover:text-white font-medium text-xs">Séries</button>
+        </div>
+        <div>
+          <select id="sortBySelect" onchange="applyFilters(true)" class="bg-slate-800 p-1.5 rounded border border-slate-700 text-xs">
+            <option value="primary_release_date.desc">Date de sortie</option>
+            <option value="popularity.desc">Popularité</option>
+            <option value="vote_average.desc">Note moyenne</option>
+          </select>
+        </div>
+        <div>
+          <select id="audioFilterSelect" onchange="syncAudioFilterAndApply(this.value)" class="bg-slate-800 p-1.5 rounded border border-slate-700 text-xs text-indigo-400 font-medium">
+            <option value="all">Audio: Tous</option>
+            <option value="vf">Audio: VF</option>
+            <option value="vostfr">Audio: VOSTFR</option>
+          </select>
+        </div>
+        <button onclick="toggleFiltersModal()" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded border border-slate-700 text-indigo-400 font-semibold text-xs flex items-center gap-1">
+          <span>⚙ Filtres</span>
+          <span id="activeFiltersBadge" class="hidden bg-indigo-600 text-white text-[10px] px-1.5 py-0.2 rounded-full"></span>
+        </button>
+      </div>
+      <div id="providerGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-12"></div>
+    </div>
+
+    <!-- VUES RÉSULTATS RECHERCHE -->
+    <section id="resultsSection" class="hidden h-full overflow-y-auto p-6 no-scrollbar space-y-4">
+      <div class="bg-slate-900 border border-slate-800 p-3 rounded-xl relative flex items-center justify-between">
+        <button onclick="showHome()" class="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded">← Retour Accueil</button>
+        <h2 id="sectionTitle" class="text-lg font-semibold text-slate-300 absolute left-1/2 -translate-x-1/2">Résultats</h2>
+        <div></div>
+      </div>
+      <div id="gridResults" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-12"></div>
+    </section>
+
+    <!-- VUE DÉTAILS FANART PLEIN ÉCRAN -->
+    <section id="detailsSection" class="hidden absolute inset-0 z-40 bg-slate-950 flex flex-col justify-between overflow-hidden">
+      <div id="detailsContent" class="h-full w-full relative flex flex-col justify-between bg-cover bg-center overflow-hidden"></div>
+    </section>
+
+    <!-- Indicateur de Chargement -->
+    <div id="loadingIndicator" class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/80 px-4 py-2 rounded-full border border-slate-700 text-center hidden z-50">
+      <span class="text-indigo-400 font-medium text-xs animate-pulse">Chargement...</span>
+    </div>
+
+  </main>
+
+  <!-- Modals -->
+  <div id="traktDeviceModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-xl max-w-md w-full space-y-4 text-center">
+      <h3 class="text-lg font-bold text-white">Connexion Trakt.tv</h3>
+      <p class="text-sm text-slate-300">Ouvrez ce lien :</p>
+      <a id="traktVerifUrl" href="https://trakt.tv/activate" target="_blank" class="text-indigo-400 underline font-semibold block break-all text-sm">https://trakt.tv/activate</a>
+      <p class="text-sm text-slate-300 mt-2">Code :</p>
+      <div id="traktUserCode" class="text-3xl font-extrabold text-indigo-400 bg-slate-800 p-3 rounded tracking-widest">-</div>
+      <p id="traktPollStatus" class="text-xs text-amber-400 animate-pulse mt-2">En attente...</p>
+      <button onclick="closeTraktDeviceModal()" class="mt-4 px-4 py-2 bg-slate-800 rounded text-sm text-white">Annuler</button>
+    </div>
+  </div>
+
+  <div id="filtersModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 hidden">
+    <div class="bg-slate-900 border border-slate-800 p-6 rounded-xl max-w-xl w-full space-y-6 max-h-[85vh] flex flex-col">
+      <h3 class="text-lg font-bold text-white border-b border-slate-800 pb-2">Filtres avancés</h3>
+      <div class="overflow-y-auto space-y-4 pr-2 flex-1 no-scrollbar">
+        <div>
+          <label class="block text-sm font-semibold text-indigo-400 mb-2">Version Audio (Vidzy)</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex items-center text-xs text-slate-300 gap-2 bg-slate-800 p-2 rounded border border-slate-700 cursor-pointer">
+              <input type="radio" name="audioModalFilter" value="all" checked onchange="document.getElementById('audioFilterSelect').value='all'"> Toutes
+            </label>
+            <label class="flex items-center text-xs text-slate-300 gap-2 bg-slate-800 p-2 rounded border border-slate-700 cursor-pointer">
+              <input type="radio" name="audioModalFilter" value="vf" onchange="document.getElementById('audioFilterSelect').value='vf'"> VF
+            </label>
+            <label class="flex items-center text-xs text-slate-300 gap-2 bg-slate-800 p-2 rounded border border-slate-700 cursor-pointer">
+              <input type="radio" name="audioModalFilter" value="vostfr" onchange="document.getElementById('audioFilterSelect').value='vostfr'"> VOSTFR
+            </label>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-indigo-400 mb-2">Langues (TMDB)</label>
+          <div id="languagesContainer" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <label class="flex items-center text-xs text-slate-300 gap-2 bg-slate-800 p-2 rounded border border-slate-700 cursor-pointer"><input type="checkbox" value="fr" class="lang-cb"> Français</label>
+            <label class="flex items-center text-xs text-slate-300 gap-2 bg-slate-800 p-2 rounded border border-slate-700 cursor-pointer"><input type="checkbox" value="en" class="lang-cb"> Anglais</label>
+            <label class="flex items-center text-xs text-slate-300 gap-2 bg-slate-800 p-2 rounded border border-slate-700 cursor-pointer"><input type="checkbox" value="ja" class="lang-cb"> Japonais</label>
+            <label class="flex items-center text-xs text-slate-300 gap-2 bg-slate-800 p-2 rounded border border-slate-700 cursor-pointer"><input type="checkbox" value="zh" class="lang-cb"> Chinois</label>
+            <label class="flex items-center text-xs text-slate-300 gap-2 bg-slate-800 p-2 rounded border border-slate-700 cursor-pointer"><input type="checkbox" value="ko" class="lang-cb"> Coréen</label>
+            <label class="flex items-center text-xs text-slate-300 gap-2 bg-slate-800 p-2 rounded border border-slate-700 cursor-pointer"><input type="checkbox" value="es" class="lang-cb"> Espagnol</label>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-red-400 mb-2">Genres à exclure</label>
+          <div id="genresExclusionContainer" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <span class="text-xs text-slate-500 col-span-full">Chargement...</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-between items-center border-t border-slate-800 pt-4">
+        <button onclick="resetFilters()" class="text-xs text-slate-400 underline">Réinitialiser</button>
+        <div class="flex gap-2">
+          <button onclick="toggleFiltersModal()" class="px-4 py-2 bg-slate-800 rounded text-sm">Fermer</button>
+          <button onclick="applyFiltersAndCloseModal()" class="px-4 py-2 bg-indigo-600 rounded text-sm text-white font-semibold">Appliquer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Vos clés API configurées et visibles directement ici :
+    let TMDB_API_KEY = "a07324c669cac4d96789197134ce272b";
+    let TRAKT_CLIENT_ID = "e6fde6173adf3c6af8fd1b0694b9b84d7c519cefc24482310e1de06c6abe5467";
+    let TRAKT_CLIENT_SECRET = "15119384341d9a61c751d8d515acbc0dd801001d4ebe85d3eef9885df80ee4d9";
+    
+    let traktToken = localStorage.getItem('trakt_access_token') || null;
+    let traktRefreshToken = localStorage.getItem('trakt_refresh_token') || null;
+
+    let currentProviderId = null;
+    let filterMediaType = 'movie';
+    let currentMedia = null;
+    let currentTraktTab = 'progress-show';
+    let currentView = 'home'; 
+    let previousView = 'home';
+    let currentPage = 1;
+    let isLoading = false;
+    let traktCacheList = [];
+    let traktBatchIndex = 0;
+    let currentSearchQuery = '';
+    let traktPollInterval = null;
+    let genresCache = { movie: [], tv: [] };
+    let lastMediaTimeout = null;
+    let inlineHlsInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateTraktUI();
+      updateLastMediaBanner();
+      
+      if (traktToken) {
+        loadTraktTab(currentTraktTab, true);
+      }
+
+      const homeViewEl = document.getElementById('homeView');
+      const providerViewEl = document.getElementById('providerView');
+      const resultsSectionEl = document.getElementById('resultsSection');
+
+      if (homeViewEl) {
+        homeViewEl.addEventListener('scroll', (e) => {
+          handleInfiniteScroll(e);
+          handleScrollVisibility(e);
+        });
+      }
+      if (providerViewEl) {
+        providerViewEl.addEventListener('scroll', (e) => {
+          handleInfiniteScroll(e);
+          handleScrollVisibility(e);
+        });
+      }
+      if (resultsSectionEl) {
+        resultsSectionEl.addEventListener('scroll', (e) => {
+          handleInfiniteScroll(e);
+          handleScrollVisibility(e);
+        });
+      }
+    });
+
+    function formatShowStatus(status) {
+      switch (status) {
+        case 'Returning Series': return 'En cours';
+        case 'Ended': return 'Terminée';
+        case 'Canceled': return 'Annulée';
+        case 'In Production': return 'En production';
+        case 'Pilot': return 'Pilote';
+        case 'Planned': return 'Prévue';
+        default: return status || 'Inconnu';
+      }
+    }
+
+    function syncAudioFilterAndApply(val) {
+      const modalRadio = document.querySelector('input[name="audioModalFilter"][value="' + val + '"]');
+      if (modalRadio) modalRadio.checked = true;
+      applyFilters(true);
+    }
+
+    function scrollToTop() {
+      if (currentView === 'home') {
+        const el = document.getElementById('homeView');
+        if (el) el.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (currentView === 'provider') {
+        const el = document.getElementById('providerView');
+        if (el) el.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (currentView === 'search') {
+        const el = document.getElementById('resultsSection');
+        if (el) el.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      document.getElementById('scrollTopBtn').classList.add('hidden');
+    }
+
+    function handleScrollVisibility(e) {
+      const el = e.target;
+      const scrollBtn = document.getElementById('scrollTopBtn');
+      if (!scrollBtn) return;
+      if (el.scrollTop > 300) {
+        scrollBtn.classList.remove('hidden');
+      } else {
+        scrollBtn.classList.add('hidden');
+      }
+    }
+
+    function makeScrollableByMouse(element) {
+      if (!element) return;
+      let isDown = false;
+      let startX;
+      let scrollLeft;
+
+      element.addEventListener('mousedown', (e) => {
+        isDown = true;
+        element.classList.add('active');
+        startX = e.pageX - element.offsetLeft;
+        scrollLeft = element.scrollLeft;
+      });
+
+      element.addEventListener('mouseleave', () => {
+        isDown = false;
+        element.classList.remove('active');
+      });
+
+      element.addEventListener('mouseup', () => {
+        isDown = false;
+        element.classList.remove('active');
+      });
+
+      element.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - element.offsetLeft;
+        const walk = (x - startX) * 2;
+        element.scrollLeft = scrollLeft - walk;
+      });
+    }
+
+    function handleInfiniteScroll(e) {
+      const el = e.target;
+      if (isLoading) return;
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) {
+        if (currentView === 'home' && traktToken) {
+          renderNextTraktBatch();
+        } else if (currentView === 'provider') {
+          applyFilters(false);
+        } else if (currentView === 'search') {
+          searchTMDB(false);
+        }
+      }
+    }
+
+    function updateTraktUI() {
+      const btn = document.getElementById('traktBtn');
+      if (!btn) return;
+      if (traktToken) {
+        btn.textContent = 'Trakt connecté';
+        btn.className = 'bg-emerald-600 px-3 py-1.5 rounded font-semibold text-white text-sm';
+      } else {
+        btn.textContent = 'Connexion Trakt';
+        btn.className = 'bg-red-600 px-3 py-1.5 rounded font-semibold text-white text-sm';
+      }
+    }
+
+    async function traktFetch(endpoint, options = {}) {
+      const url = 'https://api.trakt.tv' + endpoint;
+      return fetch(url, options);
+    }
+
+    async function handleTraktAuth() {
+      if (traktToken) {
+        if (confirm('Se déconnecter de Trakt ?')) {
+          localStorage.removeItem('trakt_access_token');
+          localStorage.removeItem('trakt_refresh_token');
+          traktToken = null;
+          traktRefreshToken = null;
+          updateTraktUI();
+          const traktGrid = document.getElementById('traktGrid');
+          if (traktGrid) traktGrid.innerHTML = '<p class="text-slate-500 col-span-full">Connectez votre compte Trakt.tv pour afficher ces sections.</p>';
+        }
+      } else {
+        if (!TRAKT_CLIENT_ID) { alert('Client ID Trakt manquant.'); return; }
+        try {
+          const res = await traktFetch('/oauth/device/code', {
+            method: 'POST', 
+            headers: { 
+              'Content-Type': 'application/json',
+              'trakt-api-key': TRAKT_CLIENT_ID,
+              'trakt-api-version': '2'
+            },
+            body: JSON.stringify({ client_id: TRAKT_CLIENT_ID })
+          });
+          
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error('Erreur HTTP ' + res.status + ': ' + errText);
+          }
+
+          const data = await res.json();
+          if (data.user_code) {
+            showTraktDeviceModal(data);
+          } else {
+            alert('Erreur connexion Trakt : code utilisateur introuvable.');
+          }
+        } catch (e) { 
+          alert('Erreur connexion Trakt : ' + e.message);
+        }
+      }
+    }
+
+    function showTraktDeviceModal(data) {
+      document.getElementById('traktVerifUrl').href = data.verification_url;
+      document.getElementById('traktVerifUrl').textContent = data.verification_url;
+      document.getElementById('traktUserCode').textContent = data.user_code;
+      document.getElementById('traktDeviceModal').classList.remove('hidden');
+      startTraktPolling(data.device_code, data.interval || 5, data.expires_in || 600);
+    }
+
+    function closeTraktDeviceModal() {
+      document.getElementById('traktDeviceModal').classList.add('hidden');
+      if (traktPollInterval) clearInterval(traktPollInterval);
+    }
+
+    function startTraktPolling(deviceCode, intervalSeconds, expiresIn) {
+      if (traktPollInterval) clearInterval(traktPollInterval);
+      const startTime = Date.now();
+      traktPollInterval = setInterval(async () => {
+        if (Date.now() - startTime > expiresIn * 1000) { clearInterval(traktPollInterval); return; }
+        try {
+          const bodyData = { client_id: TRAKT_CLIENT_ID, code: deviceCode };
+          if (TRAKT_CLIENT_SECRET) bodyData.client_secret = TRAKT_CLIENT_SECRET;
+
+          const res = await traktFetch('/oauth/device/token', {
+            method: 'POST', 
+            headers: { 
+              'Content-Type': 'application/json',
+              'trakt-api-key': TRAKT_CLIENT_ID,
+              'trakt-api-version': '2'
+            },
+            body: JSON.stringify(bodyData)
+          });
+          if (res.ok) {
+            const tokenData = await res.json();
+            if (tokenData.access_token) {
+              traktToken = tokenData.access_token;
+              traktRefreshToken = tokenData.refresh_token;
+              localStorage.setItem('trakt_access_token', traktToken);
+              localStorage.setItem('trakt_refresh_token', traktRefreshToken);
+              clearInterval(traktPollInterval);
+              closeTraktDeviceModal();
+              updateTraktUI();
+              loadTraktTab(currentTraktTab, true);
+            }
+          }
+        } catch (e) {}
+      }, intervalSeconds * 1000);
+    }
+
+    async function refreshTraktToken() {
+      if (!traktRefreshToken || !TRAKT_CLIENT_ID) return false;
+      try {
+        const bodyData = {
+          client_id: TRAKT_CLIENT_ID,
+          refresh_token: traktRefreshToken,
+          grant_type: 'refresh_token'
+        };
+        if (TRAKT_CLIENT_SECRET) bodyData.client_secret = TRAKT_CLIENT_SECRET;
+
+        const res = await traktFetch('/oauth/token', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'trakt-api-key': TRAKT_CLIENT_ID,
+            'trakt-api-version': '2'
+          },
+          body: JSON.stringify(bodyData)
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          traktToken = data.access_token;
+          traktRefreshToken = data.refresh_token;
+          localStorage.setItem('trakt_access_token', traktToken);
+          localStorage.setItem('trakt_refresh_token', traktRefreshToken);
+          updateTraktUI();
+          return true;
+        }
+      } catch (e) {}
+
+      localStorage.removeItem('trakt_access_token');
+      localStorage.removeItem('trakt_refresh_token');
+      traktToken = null;
+      traktRefreshToken = null;
+      updateTraktUI();
+      return false;
+    }
+
+    async function fetchWithTraktAuth(endpoint, options = {}) {
+      if (!options.headers) options.headers = {};
+      options.headers['Authorization'] = 'Bearer ' + traktToken;
+      options.headers['trakt-api-version'] = '2';
+      options.headers['trakt-api-key'] = TRAKT_CLIENT_ID;
+
+      let res = await traktFetch(endpoint, options);
+      if (res.status === 401) {
+        const refreshed = await refreshTraktToken();
+        if (refreshed) {
+          options.headers['Authorization'] = 'Bearer ' + traktToken;
+          res = await traktFetch(endpoint, options);
+        }
+      }
+      return res;
+    }
+
+    function showLoader(show) {
+      const loader = document.getElementById('loadingIndicator');
+      if (loader) loader.classList.toggle('hidden', !show);
+    }
+
+    function updateHeaderVisibility() {
+      const header = document.getElementById('mainHeader');
+      if (!header) return;
+      if (currentView === 'home') {
+        header.classList.remove('hidden');
+      } else {
+        header.classList.add('hidden');
+      }
+    }
+
+    function showHome() {
+      currentView = 'home';
+      updateHeaderVisibility();
+      document.getElementById('homeView').classList.remove('hidden');
+      document.getElementById('providerView').classList.add('hidden');
+      document.getElementById('detailsSection').classList.add('hidden');
+      document.getElementById('resultsSection').classList.add('hidden');
+      document.getElementById('scrollTopBtn').classList.add('hidden');
+      const traktGrid = document.getElementById('traktGrid');
+      if (traktToken && traktGrid && traktGrid.children.length <= 1) {
+        loadTraktTab(currentTraktTab, true);
+      }
+    }
+
+    function goBack() {
+      if (inlineHlsInstance) {
+        inlineHlsInstance.destroy();
+        inlineHlsInstance = null;
+      }
+      document.getElementById('detailsSection').classList.add('hidden');
+      if (previousView === 'provider') {
+        currentView = 'provider';
+        document.getElementById('providerView').classList.remove('hidden');
+      } else if (previousView === 'search') {
+        currentView = 'search';
+        document.getElementById('resultsSection').classList.remove('hidden');
+      } else {
+        showHome();
+        return;
+      }
+      updateHeaderVisibility();
+    }
+
+    function toggleFiltersModal() { document.getElementById('filtersModal').classList.toggle('hidden'); }
+
+    async function checkVidzyAvailability(tmdbId) {
+      try {
+        const res = await fetch('https://vidzy.org/api/' + tmdbId);
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data.availability === true || data.available === true) {
+          return data.languages || [];
+        }
+        return null;
+      } catch (err) { return null; }
+    }
+
+    async function checkIfInWatchlist(type, tmdbId) {
+      if (!traktToken) return false;
+      try {
+        const endpoint = type === 'movie' ? '/sync/watchlist/movies' : '/sync/watchlist/shows';
+        const res = await fetchWithTraktAuth(endpoint);
+        if (res.ok) {
+          const list = await res.json();
+          return list.some(item => {
+            const mediaObj = item.movie || item.show;
+            return mediaObj && mediaObj.ids && Number(mediaObj.ids.tmdb) === Number(tmdbId);
+          });
+        }
+      } catch (e) {}
+      return false;
+    }
+
+    async function toggleWatchlist(type, tmdbId, btnElement) {
+      if (!traktToken) {
+        alert('Veuillez vous connecter à Trakt.tv pour utiliser cette fonctionnalité.');
+        return;
+      }
+
+      const isInList = btnElement.getAttribute('data-in-watchlist') === 'true';
+      const endpoint = isInList ? '/sync/watchlist/remove' : '/sync/watchlist';
+      const bodyData = type === 'movie' 
+        ? { movies: [{ ids: { tmdb: tmdbId } }] }
+        : { shows: [{ ids: { tmdb: tmdbId } }] };
+
+      try {
+        const res = await fetchWithTraktAuth(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyData)
+        });
+
+        if (res.ok) {
+          const newState = !isInList;
+          btnElement.setAttribute('data-in-watchlist', newState ? 'true' : 'false');
+          if (newState) {
+            btnElement.className = 'bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded font-semibold text-sm transition';
+            btnElement.textContent = '✓ Dans ma liste';
+          } else {
+            btnElement.className = 'bg-slate-800/80 hover:bg-slate-700 text-white px-5 py-2.5 rounded font-semibold text-sm transition';
+            btnElement.textContent = 'Ma Liste';
+          }
+        }
+      } catch (e) {
+        alert('Erreur lors de la mise à jour de la liste.');
+      }
+    }
+
+    async function openProvider(providerId, name) {
+      currentView = 'provider';
+      previousView = 'provider';
+      updateHeaderVisibility();
+      currentProviderId = providerId;
+      document.getElementById('providerTitle').textContent = name;
+      document.getElementById('homeView').classList.add('hidden');
+      document.getElementById('providerView').classList.remove('hidden');
+      document.getElementById('resultsSection').classList.add('hidden');
+      document.getElementById('scrollTopBtn').classList.add('hidden');
+      
+      updateSortSelectOptions();
+      await renderGenreCheckboxesModal();
+
+      const frCheckbox = document.querySelector('.lang-cb[value="fr"]');
+      if (name === 'France') {
+        if (frCheckbox) {
+          frCheckbox.checked = true;
+          frCheckbox.disabled = true;
+        }
+      } else {
+        if (frCheckbox) {
+          frCheckbox.disabled = false;
+          frCheckbox.checked = false;
+        }
+      }
+
+      applyFilters(true);
+    }
+
+    function updateSortSelectOptions() {
+      const select = document.getElementById('sortBySelect');
+      if (!select) return;
+      if (filterMediaType === 'movie') {
+        select.innerHTML = 
+          '<option value="primary_release_date.desc">Date de sortie</option>' +
+          '<option value="popularity.desc">Popularité</option>' +
+          '<option value="vote_average.desc">Note moyenne</option>';
+      } else {
+        select.innerHTML = 
+          '<option value="first_air_date.desc">Date de première diffusion</option>' +
+          '<option value="popularity.desc">Popularité</option>' +
+          '<option value="vote_average.desc">Note moyenne</option>';
+      }
+    }
+
+    async function setFilterType(type) {
+      filterMediaType = type;
+      const movieBtn = document.getElementById('typeMovieBtn');
+      const tvBtn = document.getElementById('typeTvBtn');
+      if (movieBtn) movieBtn.className = type === 'movie' ? 'px-3 py-1 rounded bg-indigo-600 text-white font-medium text-xs' : 'px-3 py-1 rounded text-slate-400 text-xs';
+      if (tvBtn) tvBtn.className = type === 'tv' ? 'px-3 py-1 rounded bg-indigo-600 text-white font-medium text-xs' : 'px-3 py-1 rounded text-slate-400 text-xs';
+      
+      updateSortSelectOptions();
+      await renderGenreCheckboxesModal();
+      
+      const frCheckbox = document.querySelector('.lang-cb[value="fr"]');
+      const providerTitle = document.getElementById('providerTitle');
+      if (providerTitle && providerTitle.textContent === 'France' && frCheckbox) {
+        frCheckbox.checked = true;
+        frCheckbox.disabled = true;
+      }
+
+      applyFilters(true);
+    }
+
+    async function applyFilters(reset = false) {
+      if (!TMDB_API_KEY || !currentProviderId) return;
+      const container = document.getElementById('providerGrid');
+      if (!container) return;
+      if (reset) { 
+        currentPage = 1; 
+        container.innerHTML = ''; 
+        const providerView = document.getElementById('providerView');
+        if (providerView) providerView.scrollTo({ top: 0, behavior: 'instant' });
+      }
+      if (isLoading) return;
+
+      isLoading = true; showLoader(true);
+
+      const sortBy = document.getElementById('sortBySelect').value;
+      const audioFilter = document.getElementById('audioFilterSelect').value;
+      const selectedLangs = Array.from(document.querySelectorAll('.lang-cb:checked')).map(cb => cb.value).join('|');
+      const excludedGenres = Array.from(document.querySelectorAll('.genre-exclude-cb:checked')).map(cb => cb.value).join(',');
+
+      let availableItems = [];
+      let safetyCounter = 0;
+
+      while (availableItems.length < 10 && safetyCounter < 5) {
+        let url = 'https://api.themoviedb.org/3/discover/' + filterMediaType + '?api_key=' + TMDB_API_KEY + '&language=fr-FR&watch_region=FR&with_watch_providers=' + currentProviderId + '&sort_by=' + sortBy + '&page=' + currentPage;
+        if (selectedLangs) url += '&with_original_language=' + selectedLangs;
+        if (excludedGenres) url += '&without_genres=' + excludedGenres;
+
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          if (!data.results || data.results.length === 0) break;
+
+          const availabilityChecks = data.results.map(item => checkVidzyAvailability(item.id));
+          const resultsAvailability = await Promise.all(availabilityChecks);
+          
+          data.results.forEach((item, index) => {
+            const langs = resultsAvailability[index];
+            if (langs !== null) {
+              if (audioFilter === 'all' || langs.includes(audioFilter)) {
+                availableItems.push({ item, languages: langs });
+              }
+            }
+          });
+
+          currentPage++;
+          safetyCounter++;
+        } catch (err) {
+          break;
+        }
+      }
+
+      appendGridToContainer(availableItems, container, filterMediaType);
+      isLoading = false; showLoader(false);
+    }
+
+    async function searchTMDB(reset = true) {
+      const searchInput = document.getElementById('searchInput');
+      if (!searchInput) return;
+      const query = searchInput.value.trim();
+      if (!query || !TMDB_API_KEY) return;
+      currentView = 'search';
+      previousView = 'search';
+      updateHeaderVisibility();
+      const container = document.getElementById('gridResults');
+      if (!container) return;
+      if (reset) { 
+        currentPage = 1; 
+        currentSearchQuery = query; 
+        container.innerHTML = ''; 
+        const resultsSec = document.getElementById('resultsSection');
+        if (resultsSec) resultsSec.scrollTo({ top: 0, behavior: 'instant' });
+      }
+      document.getElementById('homeView').classList.add('hidden');
+      document.getElementById('providerView').classList.add('hidden');
+      document.getElementById('resultsSection').classList.remove('hidden');
+      document.getElementById('scrollTopBtn').classList.add('hidden');
+
+      isLoading = true; showLoader(true);
+      try {
+        const res = await fetch('https://api.themoviedb.org/3/search/multi?api_key=' + TMDB_API_KEY + '&language=fr-FR&query=' + encodeURIComponent(currentSearchQuery) + '&page=' + currentPage);
+        const data = await res.json();
+        const items = data.results ? data.results.filter(i => i.media_type === 'movie' || i.media_type === 'tv') : [];
+        const availabilityChecks = items.map(item => checkVidzyAvailability(item.id));
+        const resultsAvailability = await Promise.all(availabilityChecks);
+        
+        let availableItems = [];
+        items.forEach((item, index) => {
+          if (resultsAvailability[index] !== null) {
+            availableItems.push({ item, languages: resultsAvailability[index] });
+          }
+        });
+
+        appendGridToContainer(availableItems, container);
+        currentPage++;
+      } catch (err) {}
+      finally { isLoading = false; showLoader(false); }
+    }
+
+    function appendGridToContainer(wrappedItems, container, forcedType = null) {
+      wrappedItems.forEach(wrapped => {
+        const item = wrapped.item;
+        const languages = wrapped.languages || [];
+        const type = forcedType || item.media_type || (item.title ? 'movie' : 'tv');
+        renderSingleCard(item, container, type, false, null, languages);
+      });
+    }
+
+    function renderSingleCard(item, container, type, isFromProgressTab = false, traktId = null, languages = []) {
+      const title = item.title || item.name;
+      const poster = item.poster_path ? 'https://image.tmdb.org/t/p/w500' + item.poster_path : 'https://placehold.co/500x750?text=Pas+d+image';
+
+      let langBadgeText = '';
+      if (languages.includes('vf') && languages.includes('vostfr')) {
+        langBadgeText = 'VF + VOSTFR';
+      } else if (languages.includes('vf')) {
+        langBadgeText = 'VF';
+      } else if (languages.includes('vostfr')) {
+        langBadgeText = 'VOSTFR';
+      } else if (languages.length > 0) {
+        langBadgeText = languages.join(', ').toUpperCase();
+      }
+
+      const card = document.createElement('div');
+      card.className = "bg-slate-900 rounded-lg overflow-hidden border border-slate-800 cursor-pointer hover:border-indigo-500 transition group";
+      card.onclick = () => selectMedia(item.id, type, isFromProgressTab, traktId);
+      card.innerHTML = 
+        '<div class="relative aspect-[2/3] overflow-hidden">' +
+          '<img src="' + poster + '" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="' + title.replace(/"/g, '&quot;') + '">' +
+          '<span class="absolute top-2 right-2 bg-slate-950/80 text-indigo-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase">' + type + '</span>' +
+          (langBadgeText ? '<span class="absolute top-2 left-2 bg-emerald-600/90 text-white text-[9px] px-1.5 py-0.5 rounded font-bold shadow">' + langBadgeText + '</span>' : '') +
+        '</div>' +
+        '<div class="p-2.5">' +
+          '<h3 class="font-semibold text-xs truncate text-white">' + title + '</h3>' +
+          '<p class="text-[10px] text-slate-400">' + (item.release_date || item.first_air_date || '').substring(0, 4) + '</p>' +
+        '</div>';
+      container.appendChild(card);
+    }
+
+    async function fetchClearLogo(id, type) {
+      try {
+        const res = await fetch('https://api.themoviedb.org/3/' + type + '/' + id + '/images?api_key=' + TMDB_API_KEY);
+        const data = await res.json();
+        const logos = data.logos || [];
+        const logo = logos.find(l => l.iso_639_1 === 'fr') || logos.find(l => l.iso_639_1 === 'en') || logos[0];
+        return logo ? 'https://image.tmdb.org/t/p/w500' + logo.file_path : null;
+      } catch (e) { return null; }
+    }
+
+    async function selectMedia(id, type, isFromProgressTab = false, traktId = null) {
+      if (inlineHlsInstance) {
+        inlineHlsInstance.destroy();
+        inlineHlsInstance = null;
+      }
+      if (currentView === 'home') {
+        previousView = 'home';
+      }
+      currentView = 'details';
+      updateHeaderVisibility();
+      
+      document.getElementById('homeView').classList.add('hidden');
+      document.getElementById('providerView').classList.add('hidden');
+      document.getElementById('resultsSection').classList.add('hidden');
+      document.getElementById('scrollTopBtn').classList.add('hidden');
+      const detailsSec = document.getElementById('detailsSection');
+      if (detailsSec) detailsSec.classList.remove('hidden');
+
+      showLoader(true);
+      if (type === 'movie') {
+        const res = await fetch('https://api.themoviedb.org/3/movie/' + id + '?api_key=' + TMDB_API_KEY + '&language=fr-FR');
+        const data = await res.json();
+        const logoUrl = await fetchClearLogo(id, 'movie');
+        const inWatchlist = await checkIfInWatchlist('movie', id);
+        renderMovieDetails(data, logoUrl, inWatchlist);
+      } else {
+        const res = await fetch('https://api.themoviedb.org/3/tv/' + id + '?api_key=' + TMDB_API_KEY + '&language=fr-FR');
+        const data = await res.json();
+        const logoUrl = await fetchClearLogo(id, 'tv');
+        
+        let watchedProgress = null;
+        if (isFromProgressTab && traktToken && traktId) {
+          try {
+            const progRes = await fetchWithTraktAuth('/shows/' + traktId + '/progress/watched');
+            if (progRes.ok) {
+              watchedProgress = await progRes.json();
+            }
+          } catch (err) {}
+        }
+
+        const inWatchlist = await checkIfInWatchlist('tv', id);
+        renderShowDetails(data, logoUrl, watchedProgress, isFromProgressTab, traktId, inWatchlist);
+      }
+      showLoader(false);
+    }
+
+    async function renderMovieDetails(movie, logoUrl, inWatchlist) {
+      const container = document.getElementById('detailsContent');
+      if (!container) return;
+      const backdrop = movie.backdrop_path ? 'https://image.tmdb.org/t/p/original' + movie.backdrop_path : '';
+      const genres = movie.genres ? movie.genres.map(g => g.name).join(', ') : '';
+      const year = (movie.release_date || '').substring(0, 4);
+      const runtime = movie.runtime ? movie.runtime + ' min' : '';
+      const safeTitle = JSON.stringify(movie.title || '').replace(/"/g, '&quot;');
+
+      const availableLangs = await checkVidzyAvailability(movie.id) || ['vf'];
+
+      let playButtonsHtml = '';
+      if (availableLangs.includes('vf') && availableLangs.includes('vostfr')) {
+        playButtonsHtml = 
+          '<div class="flex items-center gap-2 flex-wrap">' +
+            '<button onclick="playMedia(\'movie\', ' + movie.id + ', ' + safeTitle + ', null, null, \'vf\')" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded font-bold text-sm flex items-center gap-2 transition">▶ Regarder en VF</button>' +
+            '<button onclick="playMedia(\'movie\', ' + movie.id + ', ' + safeTitle + ', null, null, \'vostfr\')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded font-bold text-sm flex items-center gap-2 transition">▶ Regarder en VOSTFR</button>' +
+          '</div>';
+      } else {
+        const langChoice = availableLangs.includes('vostfr') ? 'vostfr' : 'vf';
+        playButtonsHtml = 
+          '<button onclick="playMedia(\'movie\', ' + movie.id + ', ' + safeTitle + ', null, null, \'' + langChoice + '\')" class="bg-white hover:bg-slate-200 text-slate-950 px-6 py-2.5 rounded font-bold text-sm flex items-center gap-2 transition">▶ Lancer (' + langChoice.toUpperCase() + ')</button>';
+      }
+
+      const watchlistBtnClass = inWatchlist 
+        ? 'bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded font-semibold text-sm transition' 
+        : 'bg-slate-800/80 hover:bg-slate-700 text-white px-5 py-2.5 rounded font-semibold text-sm transition';
+      const watchlistBtnText = inWatchlist ? '✓ Dans ma liste' : 'Ma Liste';
+
+      container.style.backgroundImage = 'linear-gradient(to top, #020617 10%, rgba(2,6,23,0.7) 60%, rgba(2,6,23,0.4) 100%), url(' + backdrop + ')';
+      
+      container.innerHTML = 
+        '<div class="absolute top-4 left-4 z-20 flex gap-2 items-center">' +
+          '<button onclick="goBack()" class="bg-slate-900/80 hover:bg-slate-800 text-xs px-3 py-1.5 rounded border border-slate-700">← Retour</button>' +
+          '<button id="watchlistBtn" data-in-watchlist="' + (inWatchlist ? 'true' : 'false') + '" onclick="toggleWatchlist(\'movie\', ' + movie.id + ', this)" class="' + watchlistBtnClass + '">' + watchlistBtnText + '</button>' +
+        '</div>' +
+        '<div id="inlinePlayerWrapper" class="absolute top-16 left-4 z-30 hidden w-[320px] sm:w-[480px] md:w-[560px] bg-slate-900/95 border border-slate-700 rounded-xl overflow-hidden shadow-2xl">' +
+          '<div class="bg-slate-950 px-3 py-1.5 flex justify-between items-center text-xs border-b border-slate-800">' +
+            '<span id="inlinePlayerTitle" class="text-indigo-400 font-bold truncate">Lecteur StreamFlix</span>' +
+            '<button onclick="closeInlinePlayer()" class="text-slate-400 hover:text-white font-bold ml-2">✕</button>' +
+          '</div>' +
+          '<div id="inlinePlayerStatus" class="bg-slate-900 text-indigo-400 text-[10px] px-3 py-1 text-center border-b border-slate-800">Résolution du flux via Render...</div>' +
+          '<div class="relative w-full aspect-video bg-black flex items-center justify-center">' +
+            '<video id="inlineVideoPlayer" class="w-full h-full" controls autoplay></video>' +
+          '</div>' +
+        '</div>' +
+        '<div class="flex-1 flex flex-col justify-end p-8 md:p-16 max-w-4xl space-y-4">' +
+          '<div class="flex items-center gap-3 text-xs text-slate-300 font-medium">' +
+            '<span>' + genres + '</span> • <span>' + year + '</span> • <span>' + runtime + '</span>' +
+            '<span class="bg-indigo-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">TMDB ' + (movie.vote_average ? movie.vote_average.toFixed(1) : '0') + '</span>' +
+          '</div>' +
+          '<div class="my-2">' +
+            (logoUrl ? '<img src="' + logoUrl + '" class="max-h-36 md:max-h-48 object-contain" alt="' + movie.title + '">' : '<h2 class="text-4xl md:text-6xl font-black text-white">' + movie.title + '</h2>') +
+          '</div>' +
+          '<p class="text-slate-200 text-sm md:text-base leading-relaxed max-w-3xl">' + movie.overview + '</p>' +
+          '<div class="flex items-center gap-3 pt-2 flex-wrap">' +
+            playButtonsHtml +
+          '</div>' +
+        '</div>';
+    }
+
+    async function renderShowDetails(show, logoUrl, watchedProgress = null, isFromProgressTab = false, traktId = null, inWatchlist = false) {
+      const container = document.getElementById('detailsContent');
+      if (!container) return;
+      const backdrop = show.backdrop_path ? 'https://image.tmdb.org/t/p/original' + show.backdrop_path : '';
+      const genres = show.genres ? show.genres.map(g => g.name).join(', ') : '';
+      const year = (show.first_air_date || '').substring(0, 4);
+
+      const rawStatus = show.status || '';
+      const translatedStatus = formatShowStatus(rawStatus);
+      let statusBadgeClass = 'bg-slate-700 text-slate-200';
+      if (rawStatus === 'Returning Series') statusBadgeClass = 'bg-emerald-600 text-white';
+      else if (rawStatus === 'Canceled') statusBadgeClass = 'bg-red-600 text-white';
+      else if (rawStatus === 'Ended') statusBadgeClass = 'bg-blue-600 text-white';
+
+      let seasonsToDisplay = (show.seasons || []).filter(s => s.season_number > 0);
+
+      if (isFromProgressTab && watchedProgress && watchedProgress.seasons) {
+        const completedSeasonNums = watchedProgress.seasons
+          .filter(s => s.completed >= s.aired && s.aired > 0)
+          .map(s => Number(s.number));
+        const filtered = seasonsToDisplay.filter(s => !completedSeasonNums.includes(Number(s.season_number)));
+        if (filtered.length > 0) {
+          seasonsToDisplay = filtered;
+        }
+      }
+
+      const watchlistBtnClass = inWatchlist 
+        ? 'bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-semibold text-xs transition' 
+        : 'bg-slate-800/80 hover:bg-slate-700 text-white px-4 py-2 rounded font-semibold text-xs transition';
+      const watchlistBtnText = inWatchlist ? '✓ Dans ma liste' : 'Ma Liste';
+
+      container.style.backgroundImage = 'linear-gradient(to top, #020617 20%, rgba(2,6,23,0.7) 60%, rgba(2,6,23,0.3) 100%), url(' + backdrop + ')';
+
+      container.innerHTML = 
+        '<div class="absolute top-4 left-4 z-20 flex gap-2 items-center">' +
+          '<button onclick="goBack()" class="bg-slate-900/80 hover:bg-slate-800 text-xs px-3 py-1.5 rounded border border-slate-700">← Retour</button>' +
+          '<button id="watchlistBtn" data-in-watchlist="' + (inWatchlist ? 'true' : 'false') + '" onclick="toggleWatchlist(\'tv\', ' + show.id + ', this)" class="' + watchlistBtnClass + '">' + watchlistBtnText + '</button>' +
+        '</div>' +
+        '<div id="inlinePlayerWrapper" class="absolute top-16 left-4 z-30 hidden w-[320px] sm:w-[480px] md:w-[560px] bg-slate-900/95 border border-slate-700 rounded-xl overflow-hidden shadow-2xl">' +
+          '<div class="bg-slate-950 px-3 py-1.5 flex justify-between items-center text-xs border-b border-slate-800">' +
+            '<span id="inlinePlayerTitle" class="text-indigo-400 font-bold truncate">Lecteur StreamFlix</span>' +
+            '<button onclick="closeInlinePlayer()" class="text-slate-400 hover:text-white font-bold ml-2">✕</button>' +
+          '</div>' +
+          '<div id="inlinePlayerStatus" class="bg-slate-900 text-indigo-400 text-[10px] px-3 py-1 text-center border-b border-slate-800">Résolution du flux via Render...</div>' +
+          '<div class="relative w-full aspect-video bg-black flex items-center justify-center">' +
+            '<video id="inlineVideoPlayer" class="w-full h-full" controls autoplay></video>' +
+          '</div>' +
+        '</div>' +
+        '<div class="absolute inset-x-0 bottom-[1cm] px-6 md:px-12 flex flex-col justify-end gap-3.5 overflow-hidden">' +
+          '<div class="max-w-4xl space-y-1.5">' +
+            '<div class="flex items-center gap-3 text-xs text-slate-300 font-medium flex-wrap">' +
+              '<span>' + genres + '</span> • <span>' + year + '</span>' +
+              '<span class="' + statusBadgeClass + ' px-2 py-0.5 rounded text-[10px] font-bold">' + translatedStatus + '</span>' +
+              '<span class="bg-indigo-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">TMDB ' + (show.vote_average ? show.vote_average.toFixed(1) : '0') + '</span>' +
+            '</div>' +
+            '<div class="my-0.5">' +
+              (logoUrl ? '<img src="' + logoUrl + '" class="max-h-20 md:max-h-28 object-contain" alt="' + show.name + '">' : '<h2 class="text-3xl md:text-5xl font-black text-white">' + show.name + '</h2>') +
+            '</div>' +
+            '<p class="text-slate-200 text-xs md:text-sm leading-relaxed max-w-3xl line-clamp-2">' + show.overview + '</p>' +
+          '</div>' +
+          '<div class="w-full">' +
+            '<div id="seasonsCarousel" class="flex gap-2 overflow-x-auto no-scrollbar w-full drag-scroll"></div>' +
+          '</div>' +
+          '<div class="w-full">' +
+            '<div id="episodesCarousel" class="flex gap-3 py-1 overflow-x-auto no-scrollbar w-full drag-scroll"></div>' +
+          '</div>' +
+        '</div>';
+
+      const seasonsCarousel = document.getElementById('seasonsCarousel');
+      seasonsCarousel.innerHTML = '';
+      seasonsToDisplay.forEach((s, idx) => {
+        const btn = document.createElement('button');
+        btn.className = "season-tab px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition shrink-0 " + (idx === 0 ? 'bg-red-600 text-white shadow' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700');
+        btn.textContent = s.name;
+        btn.onclick = (e) => loadSeasonEpisodesCarousel(show.id, s.season_number, show.name, e.currentTarget, isFromProgressTab, traktId, watchedProgress);
+        seasonsCarousel.appendChild(btn);
+      });
+
+      makeScrollableByMouse(seasonsCarousel);
+
+      if (seasonsToDisplay.length > 0) {
+        await loadSeasonEpisodesCarousel(show.id, seasonsToDisplay[0].season_number, show.name, seasonsCarousel.children[0], isFromProgressTab, traktId, watchedProgress);
+      }
+    }
+
+    async function loadSeasonEpisodesCarousel(showId, seasonNum, showTitle, btnElement = null, isFromProgressTab = false, traktId = null, watchedProgress = null) {
+      if (seasonNum === 0) return;
+
+      if (btnElement) {
+        document.querySelectorAll('.season-tab').forEach(b => { b.className = "season-tab px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition shrink-0 bg-slate-800/80 text-slate-300 hover:bg-slate-700"; });
+        btnElement.className = "season-tab px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition shrink-0 bg-red-600 text-white shadow";
+      }
+
+      const res = await fetch('https://api.themoviedb.org/3/tv/' + showId + '/season/' + seasonNum + '?api_key=' + TMDB_API_KEY + '&language=fr-FR');
+      const data = await res.json();
+      const carousel = document.getElementById('episodesCarousel');
+      if (!carousel) return;
+
+      let watchedEpisodeNums = [];
+      if (isFromProgressTab) {
+        if (!watchedProgress && traktToken && traktId) {
+          try {
+            const progRes = await fetchWithTraktAuth('/shows/' + traktId + '/progress/watched');
+            if (progRes.ok) {
+              watchedProgress = await progRes.json();
+            }
+          } catch (e) {}
+        }
+
+        if (watchedProgress && watchedProgress.seasons) {
+          const seasonData = watchedProgress.seasons.find(s => Number(s.number) === Number(seasonNum));
+          if (seasonData && seasonData.episodes) {
+            watchedEpisodeNums = seasonData.episodes.filter(ep => ep.completed).map(ep => Number(ep.number));
+          }
+        }
+      }
+
+      const episodes = (data.episodes || []).filter(ep => ep.episode_number > 0);
+      const displayedEpisodes = isFromProgressTab 
+        ? episodes.filter(ep => !watchedEpisodeNums.includes(Number(ep.episode_number)))
+        : episodes;
+
+      if (displayedEpisodes.length === 0) {
+        carousel.innerHTML = '<p class="text-xs text-slate-400 py-2">Tous les épisodes de cette saison ont été vus.</p>';
+        return;
+      }
+
+      const showLangs = await checkVidzyAvailability(showId) || ['vf'];
+      const hasBothLangs = showLangs.includes('vf') && showLangs.includes('vostfr');
+
+      carousel.innerHTML = '';
+      displayedEpisodes.forEach(ep => {
+        const still = ep.still_path ? 'https://image.tmdb.org/t/p/w500' + ep.still_path : 'https://placehold.co/500x281?text=Pas+d+image';
+        const card = document.createElement('div');
+        card.className = "bg-slate-900/90 rounded-lg overflow-hidden border border-slate-800 transition group shrink-0 w-[240px] md:w-[280px] flex flex-col justify-between";
+        
+        const safeShowTitle = JSON.stringify(showTitle).replace(/"/g, '&quot;');
+        
+        let actionsHtml = '';
+        if (hasBothLangs) {
+          actionsHtml = 
+            '<div class="px-2 pb-2.5 flex gap-1.5">' +
+              '<button onclick="playMedia(\'tv\', ' + showId + ', ' + safeShowTitle + ', ' + seasonNum + ', ' + ep.episode_number + ', \'vf\')" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-[10px] py-1 rounded font-semibold transition">VF</button>' +
+              '<button onclick="playMedia(\'tv\', ' + showId + ', ' + safeShowTitle + ', ' + seasonNum + ', ' + ep.episode_number + ', \'vostfr\')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] py-1 rounded font-semibold transition">VOSTFR</button>' +
+            '</div>';
+        } else {
+          const singleLang = showLangs.includes('vostfr') ? 'vostfr' : 'vf';
+          actionsHtml = 
+            '<div class="px-2 pb-2.5">' +
+              '<button onclick="playMedia(\'tv\', ' + showId + ', ' + safeShowTitle + ', ' + seasonNum + ', ' + ep.episode_number + ', \'' + singleLang + '\')" class="w-full bg-slate-800 hover:bg-slate-700 text-white text-[10px] py-1.5 rounded font-semibold transition">Lancer (' + singleLang.toUpperCase() + ')</button>' +
+            '</div>';
+        }
+
+        card.innerHTML = 
+          '<div>' +
+            '<div class="relative aspect-video overflow-hidden cursor-pointer" onclick="playMedia(\'tv\', ' + showId + ', ' + safeShowTitle + ', ' + seasonNum + ', ' + ep.episode_number + ', \'' + (hasBothLangs ? 'vf' : (showLangs.includes('vostfr') ? 'vostfr' : 'vf')) + '\')">' +
+              '<img src="' + still + '" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="' + (ep.name || '').replace(/"/g, '&quot;') + '">' +
+              '<span class="absolute top-2 left-2 bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded font-bold">S' + seasonNum + 'E' + ep.episode_number + '</span>' +
+            '</div>' +
+            '<div class="p-2">' +
+              '<h3 class="font-semibold text-xs truncate text-white">' + ep.name + '</h3>' +
+              '<p class="text-[10px] text-slate-400">Épisode ' + ep.episode_number + '</p>' +
+            '</div>' +
+          '</div>' +
+          actionsHtml;
+        carousel.appendChild(card);
+      });
+
+      makeScrollableByMouse(carousel);
+    }
+
+    async function playMedia(type, id, title, season = null, episode = null, lang = 'vf') {
+      currentMedia = { type, id, title, season, episode, lang };
+      localStorage.setItem('last_media', JSON.stringify(currentMedia));
+      updateLastMediaBanner();
+
+      let targetUrl = '';
+      if (type === 'movie') {
+        targetUrl = lang === 'vostfr' 
+          ? 'https://vidzy.org/movie/' + id + '/vostfr?autoplay=1' 
+          : 'https://vidzy.org/movie/' + id + '?autoplay=1';
+      } else {
+        targetUrl = lang === 'vostfr'
+          ? 'https://vidzy.org/serie/' + id + '/' + season + '/' + episode + '/vostfr?autoplay=1'
+          : 'https://vidzy.org/serie/' + id + '/' + season + '/' + episode + '/vf?autoplay=1';
+      }
+
+      const wrapper = document.getElementById('inlinePlayerWrapper');
+      const statusEl = document.getElementById('inlinePlayerStatus');
+      const titleEl = document.getElementById('inlinePlayerTitle');
+
+      if (wrapper) wrapper.classList.remove('hidden');
+      if (titleEl) titleEl.textContent = title + (season && episode ? ' (S' + season + 'E' + episode + ')' : '') + ' [' + lang.toUpperCase() + ']';
+      if (statusEl) statusEl.textContent = "Résolution du flux via Render (Puppeteer)... Veuillez patienter.";
+
+      try {
+        // Extraction du flux via votre backend sur Render
+        const apiUrl = 'https://stream-resolver-api-1.onrender.com/api/resolve';
+        const res = await fetch(apiUrl + '?url=' + encodeURIComponent(targetUrl));
+        const data = await res.json();
+
+        if (data.success && data.url) {
+          if (statusEl) statusEl.textContent = "Flux résolu avec succès ! Lancement de la lecture...";
+          setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 2000);
+          
+          initInlineHlsPlayer(data.url);
+        } else {
+          if (statusEl) statusEl.textContent = "Erreur : " + (data.error || "Impossible de résoudre le flux.");
+        }
+      } catch (err) {
+        if (statusEl) statusEl.textContent = "Erreur de connexion au serveur de résolution Render.";
+      }
+    }
+
+    function initInlineHlsPlayer(streamUrl) {
+      const video = document.getElementById('inlineVideoPlayer');
+      if (!video) return;
+
+      if (inlineHlsInstance) {
+        inlineHlsInstance.destroy();
+      }
+
+      if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+        inlineHlsInstance = new Hls();
+        inlineHlsInstance.loadSource(streamUrl);
+        inlineHlsInstance.attachMedia(video);
+        inlineHlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
+          video.play().catch(e => console.log("Autoplay bloqué :", e));
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = streamUrl;
+        video.addEventListener('loadedmetadata', function() {
+          video.play();
+        });
+      }
+    }
+
+    function closeInlinePlayer() {
+      if (inlineHlsInstance) {
+        inlineHlsInstance.destroy();
+        inlineHlsInstance = null;
+      }
+      const wrapper = document.getElementById('inlinePlayerWrapper');
+      if (wrapper) wrapper.classList.add('hidden');
+    }
+
+    async function playNextEpisode() {
+      if (!currentMedia || currentMedia.type !== 'tv') return;
+
+      if (traktToken) {
+        try {
+          let body = {
+            shows: [{
+              ids: { tmdb: currentMedia.id },
+              seasons: [{ number: currentMedia.season, episodes: [{ number: currentMedia.episode }] }]
+            }]
+          };
+          await fetchWithTraktAuth('/sync/history', {
+            method: 'POST',
+            body: JSON.stringify(body)
+          });
+        } catch (e) {}
+      }
+
+      let nextEpisode = currentMedia.episode + 1;
+      let nextSeason = currentMedia.season;
+      playMedia(currentMedia.type, currentMedia.id, currentMedia.title, nextSeason, nextEpisode, currentMedia.lang || 'vf');
+    }
+
+    function updateLastMediaBanner() {
+      const saved = localStorage.getItem('last_media');
+      if (!saved) return;
+      currentMedia = JSON.parse(saved);
+      const lastMediaSection = document.getElementById('lastMediaSection');
+      if (!lastMediaSection) return;
+
+      let title = currentMedia.title;
+      if (currentMedia.season && currentMedia.episode) title += ' (S' + currentMedia.season + 'E' + currentMedia.episode + ')';
+      if (currentMedia.lang) title += ' [' + currentMedia.lang.toUpperCase() + ']';
+      const titleEl = document.getElementById('lastMediaTitle');
+      const watchedBtn = document.getElementById('markWatchedBtn');
+      if (titleEl) titleEl.textContent = title;
+      if (watchedBtn) watchedBtn.classList.remove('hidden');
+
+      lastMediaSection.classList.remove('hidden');
+      if (lastMediaTimeout) clearTimeout(lastMediaTimeout);
+      lastMediaTimeout = setTimeout(() => { lastMediaSection.classList.add('hidden'); }, 30000);
+    }
+
+    function reopenLastMedia() {
+      if (!currentMedia) {
+        const saved = localStorage.getItem('last_media');
+        if (saved) currentMedia = JSON.parse(saved);
+      }
+      if (!currentMedia) return;
+      playMedia(currentMedia.type, currentMedia.id, currentMedia.title, currentMedia.season, currentMedia.episode, currentMedia.lang || 'vf');
+    }
+
+    async function markCurrentAsWatched() {
+      if (!currentMedia || !traktToken) return;
+      try {
+        let body = {};
+        if (currentMedia.type === 'movie') {
+          body = { movies: [{ ids: { tmdb: currentMedia.id } }] };
+          await fetchWithTraktAuth('/sync/history', { method: 'POST', body: JSON.stringify(body) });
+        } else if (currentMedia.type === 'tv' && currentMedia.season && currentMedia.episode) {
+          body = { shows: [{ ids: { tmdb: currentMedia.id }, seasons: [{ number: currentMedia.season, episodes: [{ number: currentMedia.episode }] }] }] };
+          await fetchWithTraktAuth('/sync/history', { method: 'POST', body: JSON.stringify(body) });
+        }
+        alert('Marqué comme vu sur Trakt !');
+      } catch (e) {
+        alert('Erreur lors du marquage comme vu.');
+      }
+    }
+
+    async function switchTraktTab(tab) {
+      currentTraktTab = tab;
+      ['tabProgressShow', 'tabStartShow', 'tabStartMovie'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.className = "font-bold text-slate-400 hover:text-white pb-1 text-sm";
+      });
+      if (tab === 'progress-show') { const el = document.getElementById('tabProgressShow'); if (el) el.className = "font-bold text-indigo-400 border-b-2 border-indigo-500 pb-1 text-sm"; }
+      if (tab === 'start-show') { const el = document.getElementById('tabStartShow'); if (el) el.className = "font-bold text-indigo-400 border-b-2 border-indigo-500 pb-1 text-sm"; }
+      if (tab === 'start-movie') { const el = document.getElementById('tabStartMovie'); if (el) el.className = "font-bold text-indigo-400 border-b-2 border-indigo-500 pb-1 text-sm"; }
+
+      if (traktToken) loadTraktTab(tab, true);
+    }
+
+    async function loadTraktTab(tab, reset = false) {
+      if (!traktToken) return;
+      const container = document.getElementById('traktGrid');
+      if (!container) return;
+      if (reset) {
+        container.innerHTML = '<p class="text-slate-500 col-span-full">Chargement Trakt...</p>';
+        traktCacheList = [];
+        traktBatchIndex = 0;
+      }
+
+      showLoader(true);
+      try {
+        let endpoint = '';
+        if (tab === 'progress-show') endpoint = '/sync/watched/shows?extended=progress';
+        else if (tab === 'start-show') endpoint = '/sync/watchlist/shows/added';
+        else if (tab === 'start-movie') endpoint = '/sync/watchlist/movies/added';
+
+        const res = await fetchWithTraktAuth(endpoint);
+        if (res.ok) {
+          const data = await res.json();
+          if (tab === 'progress-show') {
+            traktCacheList = data.map(item => item.show).filter(i => i && i.ids && i.ids.tmdb);
+          } else {
+            traktCacheList = data.map(item => item.show || item.movie || item).filter(i => i && i.ids && i.ids.tmdb).reverse();
+          }
+
+          container.innerHTML = '';
+          renderNextTraktBatch();
+        } else {
+          container.innerHTML = '<p class="text-slate-500 col-span-full">Erreur de chargement des données Trakt.</p>';
+        }
+      } catch (e) {
+        container.innerHTML = '<p class="text-slate-500 col-span-full">Erreur de connexion Trakt.</p>';
+      }
+      showLoader(false);
+    }
+
+    async function renderNextTraktBatch() {
+      const container = document.getElementById('traktGrid');
+      if (!container) return;
+      const batchSize = 10;
+      const batch = traktCacheList.slice(traktBatchIndex, traktBatchIndex + batchSize);
+      if (batch.length === 0) return;
+      traktBatchIndex += batchSize;
+
+      const type = currentTraktTab === 'start-movie' ? 'movie' : 'tv';
+      const isFromProgressTab = (currentTraktTab === 'progress-show');
+
+      for (const item of batch) {
+        const tmdbId = item.ids.tmdb;
+        const traktId = item.ids.trakt;
+        const languages = await checkVidzyAvailability(tmdbId);
+        if (languages !== null) {
+          try {
+            const res = await fetch('https://api.themoviedb.org/3/' + type + '/' + tmdbId + '?api_key=' + TMDB_API_KEY + '&language=fr-FR');
+            const tmdbData = await res.json();
+            renderSingleCard(tmdbData, container, type, isFromProgressTab, traktId, languages);
+          } catch (e) {}
+        }
+      }
+    }
+
+    async function renderGenreCheckboxesModal() {
+      const container = document.getElementById('genresExclusionContainer');
+      if (!container) return;
+      container.innerHTML = '<span class="text-xs text-slate-500">Chargement...</span>';
+      try {
+        const res = await fetch('https://api.themoviedb.org/3/genre/' + filterMediaType + '/list?api_key=' + TMDB_API_KEY + '&language=fr-FR');
+        const data = await res.json();
+        genresCache[filterMediaType] = data.genres || [];
+        
+        container.innerHTML = genresCache[filterMediaType].map(g => 
+          '<label class="flex items-center text-xs text-slate-300 gap-2 bg-slate-800 p-2 rounded border border-slate-700 cursor-pointer">' +
+            '<input type="checkbox" value="' + g.id + '" class="genre-exclude-cb"> ' + g.name +
+          '</label>'
+        ).join('');
+      } catch (e) {
+        container.innerHTML = '<span class="text-xs text-slate-500">Impossible de charger les genres.</span>';
+      }
+    }
+
+    function resetFilters() {
+      document.querySelectorAll('.lang-cb').forEach(cb => { if (!cb.disabled) cb.checked = false; });
+      document.querySelectorAll('.genre-exclude-cb').forEach(cb => cb.checked = false);
+      document.getElementById('audioFilterSelect').value = 'all';
+      const defaultRadio = document.querySelector('input[name="audioModalFilter"][value="all"]');
+      if (defaultRadio) defaultRadio.checked = true;
+    }
+
+    function applyFiltersAndCloseModal() {
+      toggleFiltersModal();
+      applyFilters(true);
+    }
+  </script>
+</body>
+</html>
